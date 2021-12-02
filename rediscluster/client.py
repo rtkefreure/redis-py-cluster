@@ -568,6 +568,7 @@ class RedisCluster(Redis):
         if not args:
             raise RedisClusterException("Unable to determine command to use")
 
+        force_ro = kwargs.get('force_ro', False)
         command = args[0]
         log.debug("Command to execute : " + str(command) + " : " + str(args) + " : " + str(kwargs))
 
@@ -608,7 +609,7 @@ class RedisCluster(Redis):
                     else:
                         node = self.connection_pool.get_node_by_slot(
                             slot,
-                            self.read_from_replicas and (command in READ_COMMANDS)
+                            self.read_from_replicas and (force_ro or (command in READ_COMMANDS))
                         )
                         is_read_replica = node['server_type'] == 'slave'
 
@@ -1011,6 +1012,17 @@ class RedisCluster(Redis):
             Operation is no longer atomic.
         """
         return [self.get(arg) for arg in list_or_args(keys, args)]
+
+    def eval_ro(self, script, numkeys, *keys_and_args):
+        """
+        Execute the Lua ``script``, specifying the ``numkeys`` the script
+        will touch and the key names and argument values in ``keys_and_args``.
+        Returns the result of the script.
+
+        In practice, use the object returned by ``register_script``. This
+        function exists purely for Redis API completion.
+        """
+        return self.execute_command('EVAL', script, numkeys, *keys_and_args, force_ro=True)
 
     def mset(self, *args, **kwargs):
         """
